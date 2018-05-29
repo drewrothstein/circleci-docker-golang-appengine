@@ -55,7 +55,7 @@ WORKDIR $GOPATH
 COPY go-wrapper /usr/local/bin/
 
 ##
-# From: https://github.com/GoogleCloudPlatform/cloud-sdk-docker/blob/master/Dockerfile
+# From: https://github.com/CircleCI-Public/circleci-dockerfiles/blob/master/golang/images/1.8.7-jessie/Dockerfile
 ##
 
 # make Apt non-interactive
