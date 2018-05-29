@@ -3,9 +3,6 @@
 ##
 
 FROM buildpack-deps:jessie-scm
-FROM docker:17.12.0-ce as static-docker-source
-
-COPY --from=static-docker-source /usr/local/bin/docker /usr/local/bin/docker
 
 # make Apt non-interactive
 RUN echo 'APT::Get::Assume-Yes "true";' > /etc/apt/apt.conf.d/90circleci \
