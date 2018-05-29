@@ -1,18 +1,38 @@
 ##
-# From: https://raw.githubusercontent.com/docker-library/golang/cffcff7fce7f6b6b5c82fc8f7b3331a10590a661/1.8/jessie/Dockerfile
+# From: https://github.com/CircleCI-Public/circleci-dockerfiles/blob/master/golang/images/1.8.7-jessie/Dockerfile
 ##
 
 FROM buildpack-deps:jessie-scm
+FROM docker:17.12.0-ce as static-docker-source
 
-# gcc for cgo
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    g++ \
-    gcc \
-    libc6-dev \
-    make \
-    pkg-config \
+COPY --from=static-docker-source /usr/local/bin/docker /usr/local/bin/docker
+
+# make Apt non-interactive
+RUN echo 'APT::Get::Assume-Yes "true";' > /etc/apt/apt.conf.d/90circleci \
+  && echo 'DPkg::Options "--force-confnew";' >> /etc/apt/apt.conf.d/90circleci
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# man directory is missing in some base images
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=863199
+
+# Might need --no-install-recommends
+
+RUN apt-get update \
+  && mkdir -p /usr/share/man/man1 \
+  && apt-get install -y \
+    git mercurial xvfb \
+    locales sudo openssh-client ca-certificates tar gzip parallel \
+    net-tools netcat unzip zip bzip2 gnupg curl wget \
+    g++ gcc libc6-dev make pkg-config python-dev \
+    python-setuptools apt-transport-https lsb-release \
   && rm -rf /var/lib/apt/lists/*
 
+##
+# From: https://raw.githubusercontent.com/docker-library/golang/cffcff7fce7f6b6b5c82fc8f7b3331a10590a661/1.8/jessie/Dockerfile
+##
+
+##
 ENV GOLANG_VERSION 1.8.5
 
 RUN set -eux; \
@@ -53,26 +73,37 @@ RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH
 
 COPY go-wrapper /usr/local/bin/
-
-##
-# From: https://github.com/CircleCI-Public/circleci-dockerfiles/blob/master/golang/images/1.8.7-jessie/Dockerfile
 ##
 
-# make Apt non-interactive
-RUN echo 'APT::Get::Assume-Yes "true";' > /etc/apt/apt.conf.d/90circleci \
-  && echo 'DPkg::Options "--force-confnew";' >> /etc/apt/apt.conf.d/90circleci
+##
+# From: https://github.com/GoogleCloudPlatform/cloud-sdk-docker/blob/master/Dockerfile
+##
 
-ENV DEBIAN_FRONTEND=noninteractive
+##
+ENV CLOUD_SDK_VERSION 198.0.0
 
-# man directory is missing in some base images
-# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=863199
-RUN apt-get update \
-  && mkdir -p /usr/share/man/man1 \
-  && apt-get install -y \
-    git mercurial xvfb \
-    locales sudo openssh-client ca-certificates tar gzip parallel \
-    net-tools netcat unzip zip bzip2 gnupg curl wget
-
+RUN easy_install -U pip && \
+    pip install -U crcmod   && \
+    export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
+    echo "deb https://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" > /etc/apt/sources.list.d/google-cloud-sdk.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
+    apt-get update && \
+    apt-get install -y google-cloud-sdk=${CLOUD_SDK_VERSION}-0 \
+        google-cloud-sdk-app-engine-python=${CLOUD_SDK_VERSION}-0 \
+        google-cloud-sdk-app-engine-java=${CLOUD_SDK_VERSION}-0 \
+        google-cloud-sdk-app-engine-go=${CLOUD_SDK_VERSION}-0 \
+        google-cloud-sdk-datalab=${CLOUD_SDK_VERSION}-0 \
+        google-cloud-sdk-datastore-emulator=${CLOUD_SDK_VERSION}-0 \
+        google-cloud-sdk-pubsub-emulator=${CLOUD_SDK_VERSION}-0 \
+        google-cloud-sdk-bigtable-emulator=${CLOUD_SDK_VERSION}-0 \
+        google-cloud-sdk-cbt=${CLOUD_SDK_VERSION}-0 \
+        kubectl && \
+    gcloud config set core/disable_usage_reporting true && \
+    gcloud config set component_manager/disable_update_check true && \
+    gcloud config set metrics/environment github_docker_image && \
+    gcloud --version
+VOLUME ["/root/.config"]
+##
 
 # Set timezone to UTC by default
 RUN ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime
@@ -136,44 +167,3 @@ RUN groupadd --gid 3434 circleci \
 USER circleci
 
 CMD ["/bin/sh"]
-
-##
-# From: https://github.com/GoogleCloudPlatform/cloud-sdk-docker/blob/master/Dockerfile
-##
-FROM docker:17.12.0-ce as static-docker-source
-
-FROM buildpack-deps:jessie-scm
-ENV CLOUD_SDK_VERSION 198.0.0
-
-COPY --from=static-docker-source /usr/local/bin/docker /usr/local/bin/docker
-RUN apt-get -qqy update && apt-get install -qqy \
-        curl \
-        gcc \
-        python-dev \
-        python-setuptools \
-        apt-transport-https \
-        lsb-release \
-        openssh-client \
-        git \
-    && easy_install -U pip && \
-    pip install -U crcmod   && \
-    export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
-    echo "deb https://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" > /etc/apt/sources.list.d/google-cloud-sdk.list && \
-    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
-    apt-get update && \
-    apt-get install -y google-cloud-sdk=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-app-engine-python=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-app-engine-java=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-app-engine-go=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-datalab=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-datastore-emulator=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-pubsub-emulator=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-bigtable-emulator=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-cbt=${CLOUD_SDK_VERSION}-0 \
-        kubectl && \
-    gcloud config set core/disable_usage_reporting true && \
-    gcloud config set component_manager/disable_update_check true && \
-    gcloud config set metrics/environment github_docker_image && \
-    gcloud --version && \
-    docker --version && kubectl version --client
-VOLUME ["/root/.config"]
